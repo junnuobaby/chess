@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>五子棋</title>
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+
+<div class="btn_group">
+    <button class="btn" id="start_btn">开始游戏</button>
+    <p>机器为白子，玩家为黑子</p>
+</div>
+
+<canvas width="400px" height="400px" id="canvas"></canvas>
+<!--<table border="1" id="table"></table>-->
+
+</body>
+</html>
+
+<script>
+    /*
+      思路：实现了一个简单的人机对战，以二维数组来存储棋盘状态。白子对应机器，在二维数组中以1标识。玩家为黑子，以-1标识。
+           默认显示为canvas实现，若要切换至dom实现,只需要根据注释调用对应函数即可。判断输赢的逻辑实现和智能对战的实现都通过函数封装，
+           不论是dom还是canvas只需要传入棋子在棋盘中的位置（x，y）。
+           canvas下通过鼠标点击的位置来确定x和y的值。dom采用表格实现，创建表格单元时给表格通过设置data-*属性标识其在棋盘中的位置。
+           点击时获取其位置信息传给逻辑判断函数即可。
+     */
+
+    var start_btn = document.getElementById('start_btn');
+    var chess_game = game();
+
+    chess_game.canvasPlay();     //页面默认为canvas实现
+//    chess_game.domPlay();      //若需要切换至dom实现，只需要调用本函数。
+
+    start_btn.addEventListener('click', function (e) {
+        window.location.reload();
+    });
+
+    function game() {
+        var size = 10;                 //棋盘大小
+        var chess_array = arrayInit(size);  //初始化二维数组
+        var is_over = false;           //判断游戏是否结束
+        var cur_chess = 1;             //1代表白棋(机器)，-1代表黑棋（玩家）
+
+        return {
+            domPlay: domPlay,
+            canvasPlay: canvasPlay
+        };
+
+        //初始化二维数组
+        function arrayInit(size) {
+            var chess_array = new Array(size);
+            for(var i = 0; i < size; i++) {
+                chess_array[i] = new Array(size);
+                for(var j=0; j < size; j++) {
+                    chess_array[i][j] = 0;
+                }
+            }
+            return chess_array;
+        }
+
+        //table实现棋盘
+        function domPlay(){
+            var table = document.getElementById('table');
+            var table_cnt = '';
+            for(var i = 0; i < size; i++) {
+                table_cnt += '<tr>';
+                for(var j = 0; j < size; j++) {
+                    table_cnt += '<td class="table_chess" data-x="' + j + '" data-y="' + i + '"'+ ' data-label="' + j + '' + i + '"></td>';
+                }
+                table_cnt += '</tr>';
+            }
+            table.innerHTML = table_cnt;
+
+            table.addEventListener('click', function (e) {
+                if (is_over) {
+                    alert('游戏结束，请重新开始。');
+                    return;
+                }
+
+                if (cur_chess == -1) {
+                    alert('轮到对方出棋');
+                    return;
+                }
+
+                var target = e.target;
+                var x = parseInt(target.dataset.x);
+                var y = parseInt(target.dataset.y);
+
+
+                if(target.tagName.toLowerCase() === 'td' && chess_array[x][y] == 0) {
+                    if(cur_chess == 1) {
+                        cur_chess = -1;
+                        target.style.backgroundImage ='url("./black.png")';
+                        judge(x, y, cur_chess);
+                        var ai_result = ai(x, y, cur_chess);
+                        var ai_x = ai_result.x;
+                        var ai_y = ai_result.y;
+                        var ai_target = document.querySelectorAll('[data-label="' + ai_x + '' + ai_y + '"]')[0];
+                        ai_target.style.backgroundImage ='url("./white.png")';
+                        cur_chess = 1;
+                        judge(ai_x, ai_y, cur_chess);
+                    }
+                }
+            });
+        }
+
+        //canvas实现棋盘
+        function canvasPlay(){
+            var canvas = document.getElementById('canvas');
+            var context = canvas.getContext('2d');
+            var width = canvas.width;     //棋盘大小为400*400
+            var chess_size = width / size;
+
+            //绘制棋盘的线
+            for (var i = 0; i <= width; i += chess_size) {
+                context.beginPath();
+                context.moveTo(0, i);
+                context.lineTo(width, i);
+                context.closePath();
+                context.stroke();
+
+                context.beginPath();
+                context.moveTo(i, 0);
+                context.lineTo(i, width);
+                context.closePath();
+                context.stroke();
+            }
+
+            canvas.addEventListener('click', function (e) {
+                var rect = canvas.getBoundingClientRect();
+                var clickPosition = {
+                    x_point: e.clientX - rect.left,
+                    y_point: e.clientY - rect.top
+                };
+
+                var x = parseInt(clickPosition.x_point / chess_size);
+                var y = parseInt(clickPosition.y_point / chess_size);
+
+                if(chess_array[x][y] == 0) {
+                    if(cur_chess == 1) {
+                        cur_chess = -1;
+                        drawChess(x, y, -1);
+                        var ai_result = ai(x, y, cur_chess);
+                        var ai_x = ai_result.x;
+                        var ai_y = ai_result.y;
+                        drawChess(ai_x, ai_y, 1);
+                        cur_chess = 1;
+                    }else {
+                        alert('轮到对方出棋');
+                    }
+                }
+            });
+
+            function drawChess(x, y, chess) {
+                var white_chess = new Image();
+                var black_chess = new Image();
+
+                white_chess.src = "white.png";
+                black_chess.src = "black.png";
+
+                if(is_over) {
+                    alert('游戏结束，请重新开始。');
+                    return;
+                }
+                if(chess == 1) {
+                    white_chess.onload = function () {
+                        context.drawImage(white_chess, x * 40, y * 40 );
+                    };
+
+                }else {
+                    black_chess.onload = function () {
+                        context.drawImage(black_chess, x * 40, y * 40 );
+                    };
+                }
+                judge(x, y, chess);
+            }
+        }
+
+        //计算各个方向连在一起的棋子数量, chess为棋子的分类，x和y为棋盘中的坐标值
+        function count(x, y, chess) {
+            var direction = [0, 0, 0, 0];   //分别对应上下、左右、右上左下、左上右下四个方向与chess一样的棋子个数
+
+            //上下方向
+            for(var i = y; i >= 0; i--) {
+                if(chess_array[x][i] != chess) {
+                    break;
+                }
+                direction[0]++;
+            }
+            for(var i = y+1; i < size; i++) {
+                if(chess_array[x][i] != chess) {
+                    break;
+                }
+                direction[0]++;
+            }
+
+            //左右方向
+            for(var i = x; i >= 0; i--) {
+                if(chess_array[i][y] != chess) {
+                    break;
+                }
+                direction[1]++;
+            }
+            for(var i = x+1; i < size; i++) {
+                if(chess_array[i][y] != chess) {
+                    break;
+                }
+                direction[1]++;
+            }
+
+            //右上左下
+            for(var i = x + 1, j = y - 1; i < size && j >= 0; i++, j--) {
+                if(chess_array[i][j] != chess) {
+                    break;
+                }
+                direction[2]++;
+            }
+            for(var i = x, j = y; i >= 0 && j < size; i--, j++) {
+                if(chess_array[i][j] != chess) {
+                    break;
+                }
+                direction[2]++;
+            }
+
+            //左上右下
+            for(var i = x, j = y; i >= 0 && j >= 0; i--, j--) {
+                if(chess_array[i][j] != chess) {
+                    break;
+                }
+                direction[3]++;
+            }
+            for(var i = x + 1, j = y + 1; i < size && j < size; i++, j++) {
+                if(chess_array[i][j] != chess) {
+                    break;
+                }
+                direction[3]++;
+            }
+            return direction;
+        }
+
+        //判断本局是否结束，chess：1代表白棋，-1代表黑棋
+        function judge(x, y, chess){
+            chess_array[x][y] = chess;
+            var is_equal = true;
+            var direction = count(x, y, chess);
+            var end = direction.some(function (elem) {
+                return elem >= 5;
+            });
+
+            if(end) {
+                is_over = true;
+                if(chess == 1) {
+                    alert('机器人小白胜利，本局结束。');
+                }else {
+                    alert('玩家胜利，本局结束。');
+                }
+                return;
+            }
+
+            for(var i = 0; i < size; i++){
+                if(chess_array[i].indexOf(0) !== -1) {
+                    is_equal = false;
+                    break;
+                }
+            }
+
+            if(is_equal) {
+                alert('本轮平局');
+            }
+        }
+
+        //机器人小白智能选择走棋位置
+        function ai(x, y, chess) {
+            var direction = count(x, y, chess);
+            var danger_direction = direction.indexOf(Math.max.apply(null, direction));
+            var selected_x = -1;
+            var selected_y = -1;
+            var max_count = 0;
+
+            for(var i = 0; i < size; i++) {
+                for (var j = 0; j < size; j++) {
+                    if(chess_array[i][j] == 0){
+                        var a = Math.max.apply(null, count(i, j, -chess));
+                        console.log(a);
+                        if(Math.max.apply(null, count(i, j, -chess)) == 5) {
+                            selected_x = i;
+                            selected_y = j;
+                            return;
+                        }
+                    }
+                }
+            }
+            switch (danger_direction) {
+                case 0:   //上下方向
+                    for(var i = y; i >= 0; i-- ) {
+                        if(chess_array[x][i] == chess) continue;
+                        if(chess_array[x][i] == 0) {
+                            selected_x = x;
+                            selected_y = i;
+                            max_count = Math.max.apply(null, count(selected_x, selected_y, -chess));
+                        }
+                        break;
+                    }
+                    for(var i = y+1; i < size; i++){
+                        if(chess_array[x][i] == chess) continue;
+                        if(chess_array[x][i] == 0) {
+                            if(max_count <= Math.max.apply(null, count(x, i, -chess))) {
+                                selected_x = x;
+                                selected_y = i;
+                            }
+                        }
+                        break;
+                    }
+                    break;
+                case 1:    //左右方向
+                    for(var i = x; i >= 0; i-- ) {
+                        if(chess_array[i][y] == chess) continue;
+                        if(chess_array[i][y] == 0) {
+                            selected_x = i;
+                            selected_y = y;
+                            max_count = Math.max.apply(null, count(selected_x, selected_y, -chess));
+                        }
+                        break;
+                    }
+                    for(var i = x+1; i < size; i++){
+                        if(chess_array[i][y] == chess) continue;
+                        if(chess_array[i][y] == 0) {
+                            if(max_count <= Math.max.apply(null, count(i, y, -chess))) {
+                                selected_x = i;
+                                selected_y = y;
+                            }
+                        }
+                        break;
+                    }
+                    break;
+                case 2:  //右上左下
+                    for(var i = x + 1, j = y - 1; i < size && j >= 0; i++, j--) {
+                        if(chess_array[i][j] == chess) continue;
+                        if(chess_array[i][j] == 0) {
+                            selected_x = i;
+                            selected_y = j;
+                            max_count = Math.max.apply(null, count(selected_x, selected_y, -chess));
+                        }
+                        break;
+                    }
+
+                    for(var i = x, j = y; i >= 0 && j < size; i--, j++) {
+                        if(chess_array[i][j] == chess) continue;
+                        if(chess_array[i][j] == 0) {
+                            if(max_count <= Math.max.apply(null, count(i, j, -chess))) {
+                                selected_x = i;
+                                selected_y = j;
+                            }
+                        }
+                        break;
+                    }
+                    break;
+                case 3:  //左上右下
+                    for(var i = x, j = y; i >= 0 && j >= 0; i--, j--) {
+                        if(chess_array[i][j] == chess) continue;
+                        if(chess_array[i][j] == 0) {
+                            selected_x = i;
+                            selected_y = j;
+                            max_count = Math.max.apply(null, count(selected_x, selected_y, -chess));
+                        }
+                        break;
+                    }
+
+                    for(var i = x + 1, j = y + 1; i < size && j < size; i++, j++){
+                        if(chess_array[i][j] == chess) continue;
+                        if(chess_array[i][j] == 0) {
+                            if(max_count <= Math.max.apply(null, count(i, j, -chess))) {
+                                selected_x = i;
+                                selected_y = j;
+                            }
+                        }
+                        break;
+                    }
+                    break;
+                default:
+                    alert('error');
+            }
+
+            if(selected_x == -1 || selected_y == -1) {
+                max_count = 0;
+                for(var i = 0; i < size; i++) {
+                    for (var j = 0; j < size; j++) {
+                        if(chess_array[i][j] == 0){
+                            var tmp_count = Math.max.apply(null, count(i, j, -chess));
+                            if(max_count <= tmp_count) {
+                                selected_x = i;
+                                selected_y = j;
+                                max_count = tmp_count;
+                            }
+                        }
+                    }
+                }
+            }
+            return {
+                x: selected_x,
+                y: selected_y
+            };
+        }
+    }
+
+</script>

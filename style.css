@@ -1,0 +1,40 @@
+html, body {
+    height: 100%;
+}
+body {
+    background-color: #fff;
+}
+#canvas {
+    border: 1px solid black;
+    display:  block;
+    margin: 100px auto;
+}
+.btn_group {
+    text-align: center;
+    margin-top: 2em;
+}
+.btn {
+    padding: 0.8em 1.5em;
+    background-color: #fc7c26;
+    border-radius: 5px;
+    color: white;
+    font-size: 1.2em;
+    border: none;
+    margin: 0 auto;
+}
+
+.start_btn:hover {
+    background-color: #e44c0d;
+}
+#table {
+    width: 440px;
+    margin: 80px auto;
+    border-color: #000;
+    background-color: #ffd372;
+    display: block;
+}
+.table_chess {
+    width: 40px;
+    height: 40px;
+    background-repeat: no-repeat;
+}
